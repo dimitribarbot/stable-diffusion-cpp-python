@@ -22,6 +22,7 @@ from stable_diffusion_cpp import (
     Prediction,
     SampleMethod,
     LoraApplyMode,
+    CacheMode,
 )
 
 
@@ -56,6 +57,7 @@ class StableDiffusion:
         prediction: Union[str, Prediction, int, float] = "default",
         lora_apply_mode: Union[str, LoraApplyMode, int, float] = "auto",
         offload_params_to_cpu: bool = False,
+        enable_mmap: bool = False,
         keep_clip_on_cpu: bool = False,
         keep_control_net_on_cpu: bool = False,
         keep_vae_on_cpu: bool = False,
@@ -63,6 +65,8 @@ class StableDiffusion:
         tae_preview_only: bool = False,
         diffusion_conv_direct: bool = False,
         vae_conv_direct: bool = False,
+        circular_x: bool = False,
+        circular_y: bool = False,
         force_sdxl_vae_conv_scale: bool = False,
         chroma_use_dit_mask: bool = True,
         chroma_use_t5_mask: bool = False,
@@ -111,6 +115,7 @@ class StableDiffusion:
             prediction: Prediction type override.
             lora_apply_mode: The way to apply LoRA, (default: "auto"). In auto mode, if the model weights contain any quantized parameters, the "at_runtime" mode will be used; otherwise, "immediately" will be used. The "immediately" mode may have precision and compatibility issues with quantized parameters, but it usually offers faster inference speed and, in some cases, lower memory usage. The "at_runtime" mode, on the other hand, is exactly the opposite.
             offload_params_to_cpu: Place the weights in RAM to save VRAM, and automatically load them into VRAM when needed.
+            enable_mmap: Whether to memory-map model.
             keep_clip_on_cpu: Keep clip in CPU (for low vram).
             keep_control_net_on_cpu: Keep Control Net in CPU (for low vram).
             keep_vae_on_cpu: Keep vae in CPU (for low vram).
@@ -118,6 +123,8 @@ class StableDiffusion:
             tae_preview_only: Prevents usage of taesd for decoding the final image (for use with preview="tae").
             diffusion_conv_direct: Use Conv2d direct in the diffusion model. May crash if backend not supported.
             vae_conv_direct: Use Conv2d direct in the vae model (should improve performance). May crash if backend not supported.
+            circular_x: Enables circular RoPE wrapping on x-axis (width) only.
+            circular_y: Enables circular RoPE wrapping on y-axis (height) only.
             force_sdxl_vae_conv_scale: Force use of conv scale on SDXL vae.
             chroma_use_dit_mask: Use DiT mask for Chroma.
             chroma_use_t5_mask: Use T5 mask for Chroma.
@@ -162,6 +169,7 @@ class StableDiffusion:
         self.prediction = prediction
         self.lora_apply_mode = lora_apply_mode
         self.offload_params_to_cpu = offload_params_to_cpu
+        self.enable_mmap = enable_mmap
         self.keep_clip_on_cpu = keep_clip_on_cpu
         self.keep_control_net_on_cpu = keep_control_net_on_cpu
         self.keep_vae_on_cpu = keep_vae_on_cpu
@@ -169,6 +177,8 @@ class StableDiffusion:
         self.tae_preview_only = tae_preview_only
         self.diffusion_conv_direct = diffusion_conv_direct
         self.vae_conv_direct = vae_conv_direct
+        self.circular_x = circular_x
+        self.circular_y = circular_y
         self.force_sdxl_vae_conv_scale = force_sdxl_vae_conv_scale
         self.chroma_use_dit_mask = chroma_use_dit_mask
         self.chroma_use_t5_mask = chroma_use_t5_mask
@@ -243,7 +253,6 @@ class StableDiffusion:
                     vae_path=self.vae_path,
                     taesd_path=self.taesd_path,
                     control_net_path=self.control_net_path,
-                    lora_model_dir=self.lora_model_dir,
                     embeddings=_embedding_array,
                     embedding_count=_embedding_count,
                     photo_maker_path=self.photo_maker_path,
@@ -256,6 +265,7 @@ class StableDiffusion:
                     prediction=self.prediction,
                     lora_apply_mode=self.lora_apply_mode,
                     offload_params_to_cpu=self.offload_params_to_cpu,
+                    enable_mmap=self.enable_mmap,
                     keep_clip_on_cpu=self.keep_clip_on_cpu,
                     keep_control_net_on_cpu=self.keep_control_net_on_cpu,
                     keep_vae_on_cpu=self.keep_vae_on_cpu,
@@ -263,6 +273,8 @@ class StableDiffusion:
                     tae_preview_only=self.tae_preview_only,
                     diffusion_conv_direct=self.diffusion_conv_direct,
                     vae_conv_direct=self.vae_conv_direct,
+                    circular_x=self.circular_x,
+                    circular_y=self.circular_y,
                     force_sdxl_vae_conv_scale=self.force_sdxl_vae_conv_scale,
                     chroma_use_dit_mask=self.chroma_use_dit_mask,
                     chroma_use_t5_mask=self.chroma_use_t5_mask,
@@ -522,13 +534,13 @@ class StableDiffusion:
         # Scheduler/Sample Method
         # -------------------------------------------
 
-        scheduler = self._validate_and_set_input(scheduler, SCHEDULER_MAP, "scheduler", allow_none=True)
-        if scheduler is None:
-            scheduler = sd_cpp.sd_get_default_scheduler(self.model)
-
         sample_method = self._validate_and_set_input(sample_method, SAMPLE_METHOD_MAP, "sample_method", allow_none=True)
         if sample_method is None:
             sample_method = sd_cpp.sd_get_default_sample_method(self.model)
+
+        scheduler = self._validate_and_set_input(scheduler, SCHEDULER_MAP, "scheduler", allow_none=True)
+        if scheduler is None:
+            scheduler = sd_cpp.sd_get_default_scheduler(self.model, sample_method)
 
         # -------------------------------------------
         # Sigmas
@@ -544,8 +556,8 @@ class StableDiffusion:
         # Parameters
         # -------------------------------------------
 
-        _easycache_params = sd_cpp.sd_easycache_params_t(
-            **self._parse_easycache(
+        _cache_params = sd_cpp.sd_cache_params_t(
+            **self._parse_cache(
                 enabled=easycache,
                 option_value=easycache_options,
             )
@@ -613,7 +625,7 @@ class StableDiffusion:
             control_strength=control_strength,
             pm_params=_pm_params,
             vae_tiling_params=_vae_tiling_params,
-            easycache=_easycache_params,
+            cache=_cache_params,
         )
 
         # Log system info
@@ -878,10 +890,6 @@ class StableDiffusion:
         # Scheduler/Sample Method
         # -------------------------------------------
 
-        scheduler = self._validate_and_set_input(scheduler, SCHEDULER_MAP, "scheduler", allow_none=True)
-        if scheduler is None:
-            scheduler = sd_cpp.sd_get_default_scheduler(self.model)
-
         # "sample_method_count" is not valid here (it will crash)
         sample_method = self._validate_and_set_input(
             sample_method,
@@ -891,6 +899,10 @@ class StableDiffusion:
         )
         if sample_method is None:
             sample_method = sd_cpp.sd_get_default_sample_method(self.model)
+
+        scheduler = self._validate_and_set_input(scheduler, SCHEDULER_MAP, "scheduler", allow_none=True)
+        if scheduler is None:
+            scheduler = sd_cpp.sd_get_default_scheduler(self.model, sample_method)
 
         # High Noise
         high_noise_scheduler = self._validate_and_set_input(
@@ -947,8 +959,8 @@ class StableDiffusion:
         # Parameters
         # -------------------------------------------
 
-        _easycache_params = sd_cpp.sd_easycache_params_t(
-            **self._parse_easycache(
+        _cache_params = sd_cpp.sd_cache_params_t(
+            **self._parse_cache(
                 enabled=easycache,
                 option_value=easycache_options,
             )
@@ -997,7 +1009,7 @@ class StableDiffusion:
             seed=seed,
             video_frames=video_frames,
             vace_strength=vace_strength,
-            easycache=_easycache_params,
+            cache=_cache_params,
         )
 
         # Log system info
@@ -1181,6 +1193,7 @@ class StableDiffusion:
         output_path: str = "output.gguf",
         output_type: Union[str, GGMLType, int, float] = "default",
         tensor_type_rules: str = "",
+        convert_name: bool = False,
     ) -> bool:
         """Convert a model to gguf format.
 
@@ -1190,6 +1203,7 @@ class StableDiffusion:
             output_path: Path to save the converted model.
             output_type: The weight type (default: auto).
             tensor_type_rules: Weight type per tensor pattern (example: "^vae\\\\.=f16,model\\\\.=q8_0")
+            convert_name: Convert tensor name
 
         Returns:
             A boolean indicating success."""
@@ -1214,6 +1228,7 @@ class StableDiffusion:
                 self._clean_path(output_path).encode("utf-8"),
                 output_type,
                 tensor_type_rules.encode("utf-8"),
+                convert_name,
             )
 
         return model_converted
@@ -1339,10 +1354,11 @@ class StableDiffusion:
         return custom_sigmas
 
     # -------------------------------------------
-    # Parse EasyCache
+    # Parse Cache
     # -------------------------------------------
 
-    def _parse_easycache(self, enabled: bool, option_value: str) -> dict:
+    def _parse_cache(self, enabled: bool, option_value: str) -> dict:
+        # TODO: Handle other cache types than easycache
         parts = [p.strip() for p in str(option_value).split(",")]
         if len(parts) != 3:
             raise ValueError("easycache expects exactly 3 comma-separated values (threshold,start,end)")
@@ -1359,10 +1375,13 @@ class StableDiffusion:
             raise ValueError("easycache start/end must satisfy 0.0 <= start < end <= 1.0")
 
         return {
-            "enabled": enabled,
+            "mode": CacheMode.SD_CACHE_EASYCACHE if enabled else CacheMode.SD_CACHE_DISABLED,
             "reuse_threshold": threshold,
             "start_percent": start,
             "end_percent": end,
+            "error_decay_rate": 1.0,
+            "use_relative_threshold": True,
+            "reset_error_on_compute": True,
         }
 
     # -------------------------------------------
@@ -1795,6 +1814,7 @@ SCHEDULER_MAP = {
     "sgm_uniform": Scheduler.SGM_UNIFORM_SCHEDULER,
     "simple": Scheduler.SIMPLE_SCHEDULER,
     "smoothstep": Scheduler.SMOOTHSTEP_SCHEDULER,
+    "kl_optimal": Scheduler.KL_OPTIMAL_SCHEDULER,
     "lcm": Scheduler.LCM_SCHEDULER,
     "scheduler_count": Scheduler.SCHEDULER_COUNT,
 }
