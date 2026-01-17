@@ -54,6 +54,7 @@ class _StableDiffusionModel:
         chroma_use_dit_mask: bool,
         chroma_use_t5_mask: bool,
         chroma_t5_mask_pad: int,
+        qwen_image_zero_cond_t: bool,
         flow_shift: int,
         verbose: bool,
     ):
@@ -97,6 +98,7 @@ class _StableDiffusionModel:
             chroma_use_dit_mask=chroma_use_dit_mask,
             chroma_use_t5_mask=chroma_use_t5_mask,
             chroma_t5_mask_pad=chroma_t5_mask_pad,
+            qwen_image_zero_cond_t=qwen_image_zero_cond_t,
             flow_shift=flow_shift,
         )
 

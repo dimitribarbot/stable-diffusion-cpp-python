@@ -67,6 +67,7 @@ class StableDiffusion:
         chroma_use_dit_mask: bool = True,
         chroma_use_t5_mask: bool = False,
         chroma_t5_mask_pad: int = 1,
+        qwen_image_zero_cond_t: bool = False,
         flow_shift: float = float("inf"),
         image_resize_method: str = "crop",
         verbose: bool = True,
@@ -121,6 +122,7 @@ class StableDiffusion:
             chroma_use_dit_mask: Use DiT mask for Chroma.
             chroma_use_t5_mask: Use T5 mask for Chroma.
             chroma_t5_mask_pad: T5 mask padding size of Chroma.
+            qwen_image_zero_cond_t: Use zero_cond_t for Qwen Image.
             flow_shift: Shift value for Flow models like SD3.x or WAN (default: auto).
             image_resize_method: Method to resize images for init, mask, control and reference images ("crop" or "resize").
             verbose: Print verbose output.
@@ -171,6 +173,7 @@ class StableDiffusion:
         self.chroma_use_dit_mask = chroma_use_dit_mask
         self.chroma_use_t5_mask = chroma_use_t5_mask
         self.chroma_t5_mask_pad = chroma_t5_mask_pad
+        self.qwen_image_zero_cond_t = qwen_image_zero_cond_t
         self.flow_shift = flow_shift
         self.image_resize_method = image_resize_method
         self._stack = contextlib.ExitStack()
@@ -264,6 +267,7 @@ class StableDiffusion:
                     chroma_use_dit_mask=self.chroma_use_dit_mask,
                     chroma_use_t5_mask=self.chroma_use_t5_mask,
                     chroma_t5_mask_pad=self.chroma_t5_mask_pad,
+                    qwen_image_zero_cond_t=self.qwen_image_zero_cond_t,
                     flow_shift=self.flow_shift,
                     verbose=self.verbose,
                 )

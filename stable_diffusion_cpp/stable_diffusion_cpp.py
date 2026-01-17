@@ -377,7 +377,7 @@ class sd_embedding_t(ctypes.Structure):
 # -------------------------------------------
 
 
-# typedef struct { const char* model_path; const char* clip_l_path; const char* clip_g_path; const char* clip_vision_path; const char* t5xxl_path; const char* llm_path; const char* llm_vision_path; const char* diffusion_model_path; const char* high_noise_diffusion_model_path; const char* vae_path; const char* taesd_path; const char* control_net_path; const char* lora_model_dir; const sd_embedding_t* embeddings; uint32_t embedding_count; const char* photo_maker_path; const char* tensor_type_rules; bool vae_decode_only; bool free_params_immediately; int n_threads; enum sd_type_t wtype; enum rng_type_t rng_type; enum rng_type_t sampler_rng_type; enum prediction_t prediction; enum lora_apply_mode_t lora_apply_mode; bool offload_params_to_cpu; bool keep_clip_on_cpu; bool keep_control_net_on_cpu; bool keep_vae_on_cpu; bool diffusion_flash_attn; bool tae_preview_only; bool diffusion_conv_direct; bool vae_conv_direct; bool force_sdxl_vae_conv_scale; bool chroma_use_dit_mask; bool chroma_use_t5_mask; int chroma_t5_mask_pad; float flow_shift; } sd_ctx_params_t;
+# typedef struct { const char* model_path; const char* clip_l_path; const char* clip_g_path; const char* clip_vision_path; const char* t5xxl_path; const char* llm_path; const char* llm_vision_path; const char* diffusion_model_path; const char* high_noise_diffusion_model_path; const char* vae_path; const char* taesd_path; const char* control_net_path; const char* lora_model_dir; const sd_embedding_t* embeddings; uint32_t embedding_count; const char* photo_maker_path; const char* tensor_type_rules; bool vae_decode_only; bool free_params_immediately; int n_threads; enum sd_type_t wtype; enum rng_type_t rng_type; enum rng_type_t sampler_rng_type; enum prediction_t prediction; enum lora_apply_mode_t lora_apply_mode; bool offload_params_to_cpu; bool keep_clip_on_cpu; bool keep_control_net_on_cpu; bool keep_vae_on_cpu; bool diffusion_flash_attn; bool tae_preview_only; bool diffusion_conv_direct; bool vae_conv_direct; bool force_sdxl_vae_conv_scale; bool chroma_use_dit_mask; bool chroma_use_t5_mask; int chroma_t5_mask_pad; qwen_image_zero_cond_t; float flow_shift; } sd_ctx_params_t;
 class sd_ctx_params_t(ctypes.Structure):
     _fields_ = [
         ("model_path", ctypes.c_char_p),
@@ -417,6 +417,7 @@ class sd_ctx_params_t(ctypes.Structure):
         ("chroma_use_dit_mask", ctypes.c_bool),
         ("chroma_use_t5_mask", ctypes.c_bool),
         ("chroma_t5_mask_pad", ctypes.c_int),
+        ("qwen_image_zero_cond_t", ctypes.c_bool),
         ("flow_shift", ctypes.c_float),
     ]
 
